@@ -25,7 +25,7 @@
 #####################################################################
 .data
 	displayAddress:	.word 0x10008000
-	bugLocation: .word 814
+	bugLocation: .word 1000
 	centipedLocation: .word 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 	centipedDirection: .word 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 .text 
@@ -39,7 +39,7 @@ disp_mushrooms:
 	syscall
 	
 	# initialize loop variable $a3 with number of mushrooms to display ($a0)
-	addi $a3, $a0, 50
+	addi $a3, $a0, 100
 	
 	# load $s6 with colour yellow
 	li $s6, 0xffff00
@@ -102,8 +102,9 @@ disp_centiped:
 	la $s1, centipedDirection # load the address of the direction array into $s1
 	
 	lw $s2, displayAddress  # $s2 stores the base address for display
-	li $s3, 0xff0000	# $t3 stores the red colour code
-	li $s7, 0x000000	# $t7 stores the black colour code
+	li $s3, 0xff0000	# $s3 stores the red colour code
+	li $s4, 0xffffff	# $s4 stores the white colour code
+	li $s7, 0x000000	# $s7 stores the black colour code
 	
 	
 	lw $t1, 0($s0)		 # load a word from the centipedLocation array into $t1
@@ -141,6 +142,9 @@ move_right:
 	lw $t6, 4($t4)
 	beq $t6, $s6, right_blocked
 	
+	# check whether next unit is the bug blaster
+	beq $t6, $s4, Exit
+	
 	sw $s3, 4($t4)		# paint the next unit red
 	
 	# add 1 to unit value of current body segment 
@@ -176,6 +180,9 @@ move_left:
 	# check whether next unit is a mushroom
 	lw $t6, -4($t4)
 	beq $t6, $s6, left_blocked
+	
+	# check whether next unit is the bug blaster
+	beq $t6, $s4, Exit
 	
 	sw $s3, -4($t4)		# paint the next unit red
 	
@@ -297,7 +304,7 @@ respond_to_j:
 	add $t4, $t2, $t4	# $t4 is the address of the old bug location
 	sw $t3, 0($t4)		# paint the first (top-left) unit black.
 	
-	beq $t1, 800, skip_movement # prevent the bug from getting out of the canvas
+	beq $t1, 992, skip_movement # prevent the bug from getting out of the canvas
 	addi $t1, $t1, -1	# move the bug one location to the left
 skip_movement:
 	sw $t1, 0($t0)		# save the bug location
@@ -331,7 +338,7 @@ respond_to_k:
 	add $t4, $t2, $t4	# $t4 is the address of the old bug location
 	sw $t3, 0($t4)		# paint the block with black
 	
-	beq $t1, 831, skip_movement2 #prevent the bug from getting out of the canvas
+	beq $t1, 1023, skip_movement2 #prevent the bug from getting out of the canvas
 	addi $t1, $t1, 1	# move the bug one location to the right
 skip_movement2:
 	sw $t1, 0($t0)		# save the bug location
