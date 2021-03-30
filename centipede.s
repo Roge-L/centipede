@@ -48,13 +48,13 @@ mushroom_gen_loop:
 	# choose random location for mushroom
 	li $v0, 42
 	li $a0, 32
-	li $a1, 768
+	li $a1, 767
 	syscall
 	
 	sll $t4, $a0, 2		# multiply mushroom unit number by 4; each unit is 4 bytes
 	beq $t4, $t3, mushroom_gen_loop	# find another location when mushroom here
 	lw $t2, displayAddress	# load base address into $t2
-	add $t4, $t2, $t4	# $t4 is the address of the old bug location
+	add $t4, $t2, $t4	# $t4 is the address of the original mushroom location
 	sw $t3, 0($t4)		# paint the body with yellow
 	
 	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
@@ -77,33 +77,50 @@ Exit:
 	li $v0, 10		# terminate the program gracefully
 	syscall
 
-# function to display a static centiped	
+# function to display a centiped
 disp_centiped:
 	# move stack pointer a work and push ra onto it
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
 	
-	addi $a3, $zero, 10	 # load a3 with the loop count (10)
+	addi $a3, $zero, 10	 # initialize loop variable $a3 to number of body segments
 	la $a1, centipedLocation # load the address of the array into $a1
 	la $a2, centipedDirection # load the address of the array into $a2
 
 arr_loop:	#iterate over the loops elements to draw each body in the centiped
 	lw $t1, 0($a1)		 # load a word from the centipedLocation array into $t1
 	lw $t5, 0($a2)		 # load a word from the centipedDirection  array into $t5
-	#####
+	
 	lw $t2, displayAddress  # $t2 stores the base address for display
 	li $t3, 0xff0000	# $t3 stores the red colour code
+	li $t7, 0x000000	# $t7 stores the black colour code
 	
-	sll $t4,$t1, 2		# $t4 is the bias of the old body location in memory (offset*4)
-	add $t4, $t2, $t4	# $t4 is the address of the old bug location
-	sw $t3, 0($t4)		# paint the body with red
+	sll $t4, $t1, 2		# multiply body segment unit number by 4; each unit is 4 bytes
+	add $t4, $t2, $t4	# $t4 is the address of the original body segment location
 	
+	beq $t5, 1, move_right
+	beq $t5, -1, move_left
+	
+move_right:
+	# check whether next unit is the right side boundary
+	lw $t6, 4($t4)
+	div $t6, 128
+	beq hi, 0, right_blocked
+	
+	sw $t7, 0($t4)		# paint the current unit black
+	sw $t3, 4($t4)		# paint the next unit red
 	
 	addi $a1, $a1, 4	 # increment $a1 by one, to point to the next element in the array
 	addi $a2, $a2, 4
 	addi $a3, $a3, -1	 # decrement $a3 by 1
 	bne $a3, $zero, arr_loop
 	
+move_left:
+	
+right_blocked:
+
+left_blocked:
+
 	# pop a word off the stack and move the stack pointer
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
