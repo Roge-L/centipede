@@ -52,10 +52,10 @@ mushroom_gen_loop:
 	syscall
 	
 	sll $t4, $a0, 2		# multiply mushroom unit number by 4; each unit is 4 bytes
-	beq $t4, $t3, mushroom_gen_loop	# find another location when mushroom here
+	beq $t4, $t3, mushroom_gen_loop	# find another location if mushroom here
 	lw $t2, displayAddress	# load base address into $t2
 	add $t4, $t2, $t4	# $t4 is the address of the original mushroom location
-	sw $t3, 0($t4)		# paint the body with yellow
+	sw $t3, 0($t4)		# paint the mushroom with yellow
 	
 	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
 	bne $a3, $zero, mushroom_gen_loop
@@ -77,55 +77,153 @@ Exit:
 	li $v0, 10		# terminate the program gracefully
 	syscall
 
-# function to display a centiped
+# function to display a centipede
 disp_centiped:
-	# move stack pointer a work and push ra onto it
+	# push address of $ra (address to Loop) to the stack
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
 	
 	addi $a3, $zero, 10	 # initialize loop variable $a3 to number of body segments
-	la $a1, centipedLocation # load the address of the array into $a1
-	la $a2, centipedDirection # load the address of the array into $a2
+	la $s0, centipedLocation # load the address of the location array into $s0
+	la $s1, centipedDirection # load the address of the direction array into $s1
 
-arr_loop:	#iterate over the loops elements to draw each body in the centiped
-	lw $t1, 0($a1)		 # load a word from the centipedLocation array into $t1
-	lw $t5, 0($a2)		 # load a word from the centipedDirection  array into $t5
+arr_loop:	# iterate over the loops elements to draw each body segment of the centipede
+	lw $t1, 0($s0)		 # load a word from the centipedLocation array into $t1
+	lw $t5, 0($s1)		 # load a word from the centipedDirection  array into $t5
 	
-	lw $t2, displayAddress  # $t2 stores the base address for display
-	li $t3, 0xff0000	# $t3 stores the red colour code
-	li $t7, 0x000000	# $t7 stores the black colour code
+	lw $s2, displayAddress  # $s2 stores the base address for display
+	li $s3, 0xff0000	# $t3 stores the red colour code
+	li $s7, 0x000000	# $t7 stores the black colour code
 	
 	sll $t4, $t1, 2		# multiply body segment unit number by 4; each unit is 4 bytes
-	add $t4, $t2, $t4	# $t4 is the address of the original body segment location
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get address of current unit
 	
 	beq $t5, 1, move_right
 	beq $t5, -1, move_left
 	
+# function that moves a body segment with direction 1 (right)
 move_right:
+	# check whether next unit is the bug blaster
+	# TODO: GAME OVER INSTEAD OF RIGHT_BLOCKED
+	# beq $t6, 0xffffff, right_blocked
+	
 	# check whether next unit is the right side boundary
 	lw $t6, 4($t4)
-	div $t6, 128
-	beq hi, 0, right_blocked
+	li $t7, 128
+	div $t6, $t7
+	mfhi $t7
+	beq $t7, 0, right_blocked
 	
-	sw $t7, 0($t4)		# paint the current unit black
-	sw $t3, 4($t4)		# paint the next unit red
+	# check whether next unit is a mushroom
+	beq $t6, 0xffff00, right_blocked
 	
-	addi $a1, $a1, 4	 # increment $a1 by one, to point to the next element in the array
-	addi $a2, $a2, 4
-	addi $a3, $a3, -1	 # decrement $a3 by 1
+	sw $s7, 0($t4)		# paint the current unit black
+	sw $s3, 4($t4)		# paint the next unit red
+	
+	# add 1 to unit value of current body segment 
+	addi $t1, $t1, 1
+	#sw $t1, 0($t1)
+	
+	# add 4 to location and direction arrays to refer to next elements
+	addi $s0, $s0, 4
+	addi $s1, $s1, 4
+	
+	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
 	bne $a3, $zero, arr_loop
 	
-move_left:
-	
-right_blocked:
-
-left_blocked:
-
-	# pop a word off the stack and move the stack pointer
+	# pop address of $ra (address to Loop) from the stack
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
 	
-	jr $ra
+	jr $ra		# jump back to original position in Loop
+
+# function that moves a body segment with direction -1 (left)
+move_left:
+	# check whether next unit is the bug blaster
+	# TODO: GAME OVER INSTEAD OF LEFT_BLOCKED
+	# beq $t6, 0xffffff, left_blocked
+	
+	# check whether next unit is the left side boundary
+	lw $t6, -4($t4)
+	li $t7, 124
+	div $t6, $t7
+	mfhi $t7
+	beq $t7, 0, left_blocked
+	
+	# check whether next unit is a mushroom
+	beq $t6, 0xffff00, left_blocked
+	
+	sw $s7, 0($t4)		# paint the current unit black
+	sw $s3, -4($t4)		# paint the next unit red
+	
+	# add -1 to unit value of current body segment 
+	addi $t1, $t1, -1
+	#sw $t1, 0($t1)
+	
+	# add 4 to location and direction arrays to refer to next elements
+	addi $s0, $s0, 4
+	addi $s1, $s1, 4
+	
+	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
+	bne $a3, $zero, arr_loop
+	
+	# pop address of $ra (address to Loop) from the stack
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra		# jump back to original position in Loop
+
+# function that moves a blocked body segment with direction 1 (right)
+right_blocked:
+	sw $s7, 0($t4)		# paint the current unit black
+	sw $s3, 128($t4)	# paint the unit below current unit red
+	
+	# add 32 to unit value of current body segment 
+	addi $t1, $t1, 32
+	#sw $t1, 0($t1)
+	
+	# add -2 to direction value of current body segment
+	addi $t5, $t5, -2
+	#sw $t5, 0($t5)
+	
+	# add 4 to location and direction arrays to refer to next elements
+	addi $s0, $s0, 4
+	addi $s1, $s1, 4
+	
+	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
+	bne $a3, $zero, arr_loop
+	
+	# pop address of $ra (address to Loop) from the stack
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra		# jump back to original position in Loop
+
+# function that moves a blocked body segment with direction -1 (left)
+left_blocked:
+	sw $s7, 0($t4)		# paint the current unit black
+	sw $s3, 128($t4)	# paint the unit below current unit red
+	
+	# add 32 to unit value of current body segment 
+	addi $t1, $t1, 32
+	#sw $t1, 0($t1)
+	
+	# add 2 to direction value of current body segment
+	addi $t5, $t5, 2
+	#sw $t5, 0($t5)
+	
+	# add 4 to location and direction arrays to refer to next elements
+	addi $s0, $s0, 4
+	addi $s1, $s1, 4
+	
+	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
+	bne $a3, $zero, arr_loop
+	
+	# pop address of $ra (address to Loop) from the stack
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra		# jump back to original position in Loop
 
 # function to detect any keystroke
 check_keystroke:
