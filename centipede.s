@@ -34,28 +34,38 @@
 disp_mushrooms:	
 	# choose random number of mushrooms to display
 	li $v0, 42
-	li $a0, 80
-	li $a1, 130
+	li $a0, 0	# not a lower bound
+	li $a1, 10
 	syscall
 	
 	# initialize loop variable $a3 with number of mushrooms to display ($a0)
-	add $a3, $zero, $a0
+	addi $a3, $a0, 50
 	
-	# load $t3 with colour yellow
-	li $t3, 0xffff00
+	# load $s6 with colour yellow
+	li $s6, 0xffff00
+	
+	lw $s2, displayAddress  # $s2 stores the base address for display
 	
 mushroom_gen_loop:
 	# choose random location for mushroom
 	li $v0, 42
-	li $a0, 32
+	li $a0, 0	# not a lower bound
 	li $a1, 767
 	syscall
 	
+	addi $a0, $a0, 32	# prevent mushroom spawn on first row
+	
 	sll $t4, $a0, 2		# multiply mushroom unit number by 4; each unit is 4 bytes
-	beq $t4, $t3, mushroom_gen_loop	# find another location if mushroom here
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get address of current unit
+	lw $t4, 0($t4)		# retrieve value of address at $t4
+	
+	beq $t4, $s6, mushroom_gen_loop	# find another location if mushroom here
 	lw $t2, displayAddress	# load base address into $t2
-	add $t4, $t2, $t4	# $t4 is the address of the original mushroom location
-	sw $t3, 0($t4)		# paint the mushroom with yellow
+	
+	sll $t4, $a0, 2		# multiply mushroom unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get address of current unit
+	
+	sw $s6, 0($t4)		# paint the mushroom with yellow
 	
 	addi $a3, $a3, -1	 # decrement loop variable $a3 by 1
 	bne $a3, $zero, mushroom_gen_loop
@@ -71,6 +81,10 @@ Loop:
 	jal disp_centiped
 	jal check_keystroke
 
+	li $v0, 32
+	li $a0, 10
+	syscall
+	
 	j Loop
 
 Exit:
@@ -86,14 +100,23 @@ disp_centiped:
 	addi $a3, $zero, 10	 # initialize loop variable $a3 to number of body segments
 	la $s0, centipedLocation # load the address of the location array into $s0
 	la $s1, centipedDirection # load the address of the direction array into $s1
-
-arr_loop:	# iterate over the loops elements to draw each body segment of the centipede
-	lw $t1, 0($s0)		 # load a word from the centipedLocation array into $t1
-	lw $t5, 0($s1)		 # load a word from the centipedDirection  array into $t5
 	
 	lw $s2, displayAddress  # $s2 stores the base address for display
 	li $s3, 0xff0000	# $t3 stores the red colour code
 	li $s7, 0x000000	# $t7 stores the black colour code
+	
+	
+	lw $t1, 0($s0)		 # load a word from the centipedLocation array into $t1
+	lw $t5, 0($s1)		 # load a word from the centipedDirection  array into $t5
+	
+	sll $t4, $t1, 2		# multiply body segment unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get address of current unit
+	
+	sw $s7, 0($t4)		# paint first unit black
+
+arr_loop:	# iterate over the loops elements to draw each body segment of the centipede
+	lw $t1, 0($s0)		 # load a word from the centipedLocation array into $t1
+	lw $t5, 0($s1)		 # load a word from the centipedDirection  array into $t5
 	
 	sll $t4, $t1, 2		# multiply body segment unit number by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get address of current unit
@@ -108,21 +131,21 @@ move_right:
 	# beq $t6, 0xffffff, right_blocked
 	
 	# check whether next unit is the right side boundary
-	lw $t6, 4($t4)
+	la $t6, 4($t4)
 	li $t7, 128
 	div $t6, $t7
 	mfhi $t7
 	beq $t7, 0, right_blocked
 	
 	# check whether next unit is a mushroom
-	beq $t6, 0xffff00, right_blocked
+	lw $t6, 4($t4)
+	beq $t6, $s6, right_blocked
 	
-	sw $s7, 0($t4)		# paint the current unit black
 	sw $s3, 4($t4)		# paint the next unit red
 	
 	# add 1 to unit value of current body segment 
 	addi $t1, $t1, 1
-	#sw $t1, 0($t1)
+	sw $t1, 0($s0)
 	
 	# add 4 to location and direction arrays to refer to next elements
 	addi $s0, $s0, 4
@@ -144,21 +167,21 @@ move_left:
 	# beq $t6, 0xffffff, left_blocked
 	
 	# check whether next unit is the left side boundary
-	lw $t6, -4($t4)
-	li $t7, 124
+	la $t6, 0($t4)
+	li $t7, 128
 	div $t6, $t7
 	mfhi $t7
 	beq $t7, 0, left_blocked
 	
 	# check whether next unit is a mushroom
-	beq $t6, 0xffff00, left_blocked
+	lw $t6, -4($t4)
+	beq $t6, $s6, left_blocked
 	
-	sw $s7, 0($t4)		# paint the current unit black
 	sw $s3, -4($t4)		# paint the next unit red
 	
 	# add -1 to unit value of current body segment 
 	addi $t1, $t1, -1
-	#sw $t1, 0($t1)
+	sw $t1, 0($s0)
 	
 	# add 4 to location and direction arrays to refer to next elements
 	addi $s0, $s0, 4
@@ -175,16 +198,15 @@ move_left:
 
 # function that moves a blocked body segment with direction 1 (right)
 right_blocked:
-	sw $s7, 0($t4)		# paint the current unit black
 	sw $s3, 128($t4)	# paint the unit below current unit red
 	
 	# add 32 to unit value of current body segment 
 	addi $t1, $t1, 32
-	#sw $t1, 0($t1)
+	sw $t1, 0($s0)
 	
 	# add -2 to direction value of current body segment
 	addi $t5, $t5, -2
-	#sw $t5, 0($t5)
+	sw $t5, 0($s1)
 	
 	# add 4 to location and direction arrays to refer to next elements
 	addi $s0, $s0, 4
@@ -201,16 +223,15 @@ right_blocked:
 
 # function that moves a blocked body segment with direction -1 (left)
 left_blocked:
-	sw $s7, 0($t4)		# paint the current unit black
 	sw $s3, 128($t4)	# paint the unit below current unit red
 	
 	# add 32 to unit value of current body segment 
 	addi $t1, $t1, 32
-	#sw $t1, 0($t1)
+	sw $t1, 0($s0)
 	
 	# add 2 to direction value of current body segment
 	addi $t5, $t5, 2
-	#sw $t5, 0($t5)
+	sw $t5, 0($s1)
 	
 	# add 4 to location and direction arrays to refer to next elements
 	addi $s0, $s0, 4
