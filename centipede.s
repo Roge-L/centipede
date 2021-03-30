@@ -127,10 +127,6 @@ arr_loop:	# iterate over the loops elements to draw each body segment of the cen
 	
 # function that moves a body segment with direction 1 (right)
 move_right:
-	# check whether next unit is the bug blaster
-	# TODO: GAME OVER INSTEAD OF RIGHT_BLOCKED
-	# beq $t6, 0xffffff, right_blocked
-	
 	# check whether next unit is the right side boundary
 	la $t6, 4($t4)
 	li $t7, 128
@@ -166,10 +162,6 @@ move_right:
 
 # function that moves a body segment with direction -1 (left)
 move_left:
-	# check whether next unit is the bug blaster
-	# TODO: GAME OVER INSTEAD OF LEFT_BLOCKED
-	# beq $t6, 0xffffff, left_blocked
-	
 	# check whether next unit is the left side boundary
 	la $t6, 0($t4)
 	li $t7, 128
@@ -205,6 +197,10 @@ move_left:
 
 # function that moves a blocked body segment with direction 1 (right)
 right_blocked:
+	# check whether next unit is the bug blaster
+	lw $t6, 128($t4)
+	beq $t6, $s4, Exit
+	
 	sw $s3, 128($t4)	# paint the unit below current unit red
 	
 	# add 32 to unit value of current body segment 
@@ -230,6 +226,10 @@ right_blocked:
 
 # function that moves a blocked body segment with direction -1 (left)
 left_blocked:
+	# check whether next unit is the bug blaster
+	lw $t6, 128($t4)
+	beq $t6, $s4, Exit
+	
 	sw $s3, 128($t4)	# paint the unit below current unit red
 	
 	# add 32 to unit value of current body segment 
@@ -297,11 +297,10 @@ respond_to_j:
 	la $t0, bugLocation	# load the address of buglocation from memory
 	lw $t1, 0($t0)		# load the bug location itself in t1
 	
-	lw $t2, displayAddress  # $t2 stores the base address for display
 	li $t3, 0x000000	# $t3 stores the black colour code
 	
-	sll $t4,$t1, 2		# $t4 the bias of the old buglocation
-	add $t4, $t2, $t4	# $t4 is the address of the old bug location
+	sll $t4, $t1, 2		# multiply bug blaster unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of bug blaster
 	sw $t3, 0($t4)		# paint the first (top-left) unit black.
 	
 	beq $t1, 992, skip_movement # prevent the bug from getting out of the canvas
@@ -311,8 +310,8 @@ skip_movement:
 
 	li $t3, 0xffffff	# $t3 stores the white colour code
 	
-	sll $t4,$t1, 2
-	add $t4, $t2, $t4
+	sll $t4, $t1, 2		# multiply bug blaster unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of bug blaster
 	sw $t3, 0($t4)		# paint the first (top-left) unit white.
 	
 	
@@ -331,11 +330,10 @@ respond_to_k:
 	la $t0, bugLocation	# load the address of buglocation from memory
 	lw $t1, 0($t0)		# load the bug location itself in t1
 	
-	lw $t2, displayAddress  # $t2 stores the base address for display
 	li $t3, 0x000000	# $t3 stores the black colour code
 	
-	sll $t4,$t1, 2		# $t4 the bias of the old buglocation
-	add $t4, $t2, $t4	# $t4 is the address of the old bug location
+	sll $t4, $t1, 2		# multiply bug blaster unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of bug blaster
 	sw $t3, 0($t4)		# paint the block with black
 	
 	beq $t1, 1023, skip_movement2 #prevent the bug from getting out of the canvas
@@ -345,8 +343,8 @@ skip_movement2:
 
 	li $t3, 0xffffff	# $t3 stores the white colour code
 	
-	sll $t4,$t1, 2
-	add $t4, $t2, $t4
+	sll $t4, $t1, 2		# multiply bug blaster unit number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of bug blaster
 	sw $t3, 0($t4)		# paint the block with white
 	
 	
