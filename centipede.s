@@ -13,11 +13,11 @@
 #
 # Which milestone is reached in this submission?
 # (See the project handout for descriptions of the milestones)
-# - Milestone 1
+# - Milestone 3
 #
 # Which approved additional features have been implemented?
 # (See the project handout for the list of additional features)
-# 1. IPR
+# 1. None
 #
 # Any additional information that the TA needs to know:
 # - IPR
@@ -301,7 +301,7 @@ gen_flea_movement:
 	# choose the flea movement type
 	li $v0, 42
 	li $a0, 0
-	li $a1, 6
+	li $a1, 7
 	syscall
 	
 	beq $a0, 0, flea_up
@@ -310,6 +310,25 @@ gen_flea_movement:
 	beq $a0, 3, flea_rdiagdown
 	beq $a0, 4, flea_ldiagup
 	beq $a0, 5, flea_ldiagdown
+	beq $a0, 6, flea_stay
+	
+flea_stay:
+	# choose the flea movement type
+	li $v0, 42
+	li $a0, 0
+	li $a1, 150
+	syscall
+	addi $a3, $a3, 350	# initialize loop variable $a3
+flea_stay_loop:
+	addi $a3, $a3, -1	# decrement loop variable
+	
+	bne $a3, $zero, flea_stay_loop
+	
+	# pop address of $ra (address to Loop) from the stack
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra		# jump back to original position in Loop
 	
 flea_up:
 	addi $a3, $zero, 3	 # initialize loop variable $a3 to number of body segments
@@ -348,6 +367,9 @@ flea_down_loop:
 	sll $t4, $t1, 2		# multiply flea unit number by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
 	
+	lw $t2, 0($t4)		# get colour value of current address
+	beq $t2, $s4, Exit	# game over if hit bug blaster
+	
 	# return to point in main Loop if current address > lower canvas boundary
 	bgt $t1, 1023, return_to_main
 	
@@ -374,6 +396,9 @@ flea_rdiagup_loop:
 	
 	sll $t4, $t1, 2		# multiply unit in front of flea number by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
+	
+	lw $t2, 0($t4)		# get colour value of current address
+	beq $t2, $s4, Exit	# game over if hit bug blaster
 	
 	# return to point in main Loop if unit in front of flea < lower mushroom spawn boundary
 	blt $t1, 800, return_to_main
@@ -402,6 +427,9 @@ flea_rdiagdown_loop:
 	sll $t4, $t1, 2		# multiply right unit behind the flea by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
 	
+	lw $t2, 0($t4)		# get colour value of current address
+	beq $t2, $s4, Exit	# game over if hit bug blaster
+	
 	# return to point in main Loop if right unit behind the flea > lower canvas boundary
 	bgt $t1, 1023, return_to_main
 	
@@ -429,6 +457,9 @@ flea_ldiagup_loop:
 	sll $t4, $t1, 2		# multiply left unit in front of flea number by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
 	
+	lw $t2, 0($t4)		# get colour value of current address
+	beq $t2, $s4, Exit	# game over if hit bug blaster
+	
 	# return to point in main Loop if unit in front of flea < lower mushroom spawn boundary
 	blt $t1, 800, return_to_main
 	
@@ -455,6 +486,9 @@ flea_ldiagdown_loop:
 	
 	sll $t4, $t1, 2		# multiply right unit behind the flea by 4; each unit is 4 bytes
 	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
+	
+	lw $t2, 0($t4)		# get colour value of current address
+	beq $t2, $s4, Exit	# game over if hit bug blaster
 	
 	# return to point in main Loop if right unit behind the flea > lower canvas boundary
 	bgt $t1, 1023, return_to_main
@@ -507,6 +541,7 @@ get_keyboard_input:
 	beq $t2, 0x6A, respond_to_j
 	beq $t2, 0x6B, respond_to_k
 	beq $t2, 0x78, respond_to_x
+	beq $t2, 0x72, respond_to_r
 	
 	# pop address of $ra (address to check_keystroke) from the stack
 	lw $ra, 0($sp)
@@ -600,6 +635,11 @@ shoot:
 	sw $s5, 0($t4)		# paint the current unit green
 	addi $t4, $t4, -128	# increase address value $t4 by 128 for next row
 	
+	# System call for sleeping
+	li $v0, 32
+	li $a0, 10
+	syscall
+	
 	j shoot
 	
 leave_bug_blaster:
@@ -641,6 +681,14 @@ fleaHit:
 
 	sw $t1, 0($s0)		# store new health of flea back into fleaHealth
 	
+	la $t0, fleaLocation	# load the address of buglocation from memory	
+	lw $t1, 0($t0)		# load the flea location itself in t1
+	
+	sll $t4, $t1, 2		# multiply left unit in front of flea number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
+	sw $s7, 0($t4)		# paint the unit behind the current unit black
+	sw $t1, 0($t0)		# save the flea location
+	
 	# pop address of $ra (address to get_keyboard_input) from the stack
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
@@ -656,18 +704,58 @@ mushroomHit:
 	addi $sp, $sp, 4
 	
 	jr $ra
-
-delay:
-	# move stack pointer a work and push ra onto it
+	
+respond_to_r:
+	# push address of $ra (address to get_keyboard_input) to the stack
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
 	
-	li $a2, 10000
-	addi $a2, $a2, -1
-	bgtz $a2, delay
+	la $t0, bugLocation	# load the address of buglocation from memory	
+	li $t1, 1000		# reset bug location back to 1000
+	sw $t1, 0($t0)		# save the bug location
+
+	la $t0, centipedLocation	# load the address of centipedLocation from memory	
+	la $t3, centipedDirection	# load the address of centipedDirection from memory
+	addi $a3, $a3, 0		# initialize loop variable
+	li $t4, 1
+resetCentipedLocation:
+	sw $a3, 0($t0)		# save the centipede location
+	sw $t4, 0($t3)		# save the direction
+
+	addi $t0, $t0, 4	# next element in array
+	addi $t3, $t3, 4	# next element in array
 	
-	# pop a word off the stack and move the stack pointer
+	addi $a3, $a3, 1	# update loop variable
+	bne $a3, 10, resetCentipedLocation
+	
+	la $t0, centipedeHealth
+	li $t1, 3
+	sw $t1, 0($t0)
+	
+	la $t0, fleaHealth
+	li $t1, 0
+	sw $t1, 0($t0)
+	
+	la $t0, fleaLocation
+	li $t1, 800
+	sw $t1, 0($t0)
+
+	addi $a3, $a3, 1024		# initialize loop variable
+resetCanvas:
+	sll $t4, $a3, 2		# multiply left unit in front of flea number by 4; each unit is 4 bytes
+	add $t4, $s2, $t4	# add number of $t4 bytes to base address to get current address of flea
+	sw $s7, 0($t4)		# paint the current unit black
+	
+	addi $a3, $a3, -1
+	bne $a3, 0, resetCanvas
+	
+	# pop address of $ra (address to get_keyboard_input) from the stack
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
 	
-	jr $ra
+	# System call for sleeping
+	li $v0, 32
+	li $a0, 100
+	syscall
+	
+	j disp_mushrooms
